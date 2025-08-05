@@ -1,0 +1,28 @@
+# --- Stage 1: Build Stage ---
+# Use a full Python image to build dependencies, which may require build tools.
+FROM python:3.9-slim as builder
+
+WORKDIR /usr/src/app
+
+# Install build dependencies if needed (ping3 needs root for raw sockets)
+# In this case, it's simple, but for complex packages this is useful.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# --- Stage 2: Final Stage ---
+# Use a minimal base image for the final container to reduce size and attack surface.
+FROM python:3.9-slim
+
+WORKDIR /usr/src/app
+
+# Copy only the installed packages from the builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy the application code
+COPY app.py ./
+
+# Run the application
+# Note: ping3 requires root privileges to create raw ICMP sockets.
+# In a real production environment, you would grant the CAP_NET_RAW capability instead of running as root.
+CMD [ "python", "./app.py" ]
